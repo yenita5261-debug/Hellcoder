@@ -3,16 +3,12 @@ import requests
 import re
 import threading
 
-app = Flask(name)
+app = Flask(__name__)
 
 # ==============================
 # CONFIG
 # ==============================
 TARGET = "https://osintpromax-2andkey-eishwk.onrender.com?query="
-
-# Telegram bot config
-TELEGRAM_TOKEN = "8237933590:AAF9KGzKfhHUGKGp8_6eZc5lI-JWzGFx39I"
-CHAT_ID = "8016126238"
 
 # Replacement
 pattern = re.compile(r'@?promaxchatbot', re.I)
@@ -24,26 +20,6 @@ active_ip = None
 lock = threading.Lock()
 
 # ==============================
-# UTILS
-# ==============================
-def send_to_telegram(msg):
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        payload = {"chat_id": CHAT_ID, "text": msg}
-        requests.post(url, data=payload, timeout=5)
-    except Exception as e:
-        print("Telegram error:", e)
-
-def replace_response(data):
-    if isinstance(data, str):
-        return pattern.sub('@LOD3MON', data)
-    if isinstance(data, list):
-        return [replace_response(i) for i in data]
-    if isinstance(data, dict):
-        return {k: replace_response(v) for k, v in data.items()}
-    return data
-
-# ==============================
 # ROUTES
 # ==============================
 @app.before_request
@@ -51,13 +27,13 @@ def check_single_active():
     global active_ip
     client_ip = request.remote_addr
 
-    send_to_telegram(f"Request from {client_ip}")
-
     with lock:
         if active_ip is None:
+            # पहला device -> allow and lock
             active_ip = client_ip
-            send_to_telegram(f"✅ API locked to {client_ip}")
+            print(f"✅ API locked to {client_ip}")
         elif active_ip != client_ip:
+            # कोई और device -> block
             return jsonify({"error": f"Access locked for {active_ip}. Your IP {client_ip} denied."}), 403
 
 @app.route("/")
@@ -66,10 +42,10 @@ def home():
     <!DOCTYPE html>
     <html>
     <head>
-        <title>RAVAN API</title>
+        <title>LODEMONHACKER API</title>
     </head>
     <body style="font-family: Arial; text-align:center; padding:40px;">
-        <h2>🔥 Welcome to RAVAN API 🔥</h2>
+        <h2>🔥 Welcome to LODEMONHACKER API 🔥</h2>
         <p>Use: <code>/search?query=919999999999</code></p>
     </body>
     </html>
@@ -87,6 +63,15 @@ def search():
 
         try:
             data = resp.json()
+            # Replace @ProMaxChatBot with @LOD3MON
+            def replace_response(d):
+                if isinstance(d, str):
+                    return pattern.sub('@LOD3MON', d)
+                if isinstance(d, list):
+                    return [replace_response(i) for i in d]
+                if isinstance(d, dict):
+                    return {k: replace_response(v) for k, v in d.items()}
+                return d
             return jsonify(replace_response(data))
         except Exception:
             replaced = pattern.sub('@LOD3MON', text)
@@ -94,5 +79,5 @@ def search():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-if name == "main":
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
